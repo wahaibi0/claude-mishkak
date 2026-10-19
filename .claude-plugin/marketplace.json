@@ -1,0 +1,6 @@
+{
+  "name": "mishkak",
+  "description": "Clawd grills mishkak while Claude works.",
+  "owner": { "name": "Ahmed Al Wahaibi" },
+  "plugins": [{ "name": "mishkak", "source": "./" }]
+}
