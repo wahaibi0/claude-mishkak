@@ -26,7 +26,7 @@ const SKY = ['#0d1029', '#0d1029', '#121638', '#181c44', '#1f224e', '#282755', '
 const DUNE_FAR = '#3c2e44'
 const DUNE = ['#9a7458', '#7a5846', '#5f4338'] // moonlit crest, face, foot
 const MOON = '#f3e6b8'
-const STAR = '#cfd6ff'
+const STAR = ['#cfd6ff', '#8890c0'] // bright, dim
 const TRUNK = ['#4f3626', '#3d2a1e']
 const PALM: Record<string, string> = { g: '#2f6034', G: '#1f4226', d: '#a0582a' } // fronds, shade, dates
 
@@ -88,7 +88,14 @@ const emberStep = ([, phase, , dir]: (typeof EMBERS)[number], f: number) => {
   return [dir * SWAY[p], -2 * p]
 }
 
-const STARS: [number, number][] = [[3, 1], [14, 4], [22, 1], [31, 6], [40, 2], [47, 5], [36, 0], [9, 7], [58, 3], [63, 8], [71, 1], [26, 9], [52, 10], [78, 4]]
+// Stars twinkle as in textless's campfire: each dims for part of its own period, so they never twinkle in step.
+// Each is x, y, period in frames (dividing the loop), frames dim, and phase; none sits behind the moon or a palm.
+const STARS: [number, number, number, number, number][] = [
+  [3, 1, 12, 3, 0], [14, 4, 16, 4, 5], [22, 1, 8, 2, 3], [40, 2, 12, 2, 7], [47, 5, 8, 2, 6],
+  [36, 0, 16, 5, 2], [9, 7, 12, 4, 9], [58, 3, 16, 4, 14], [63, 8, 8, 2, 1], [71, 1, 12, 3, 4], [26, 9, 16, 3, 8],
+  [52, 10, 12, 2, 10],
+]
+const starDim = ([, , period, dim, phase]: (typeof STARS)[number], f: number) => (f + phase) % period < dim
 
 const box = (g: Grid, x: number, y: number, w: number, h: number, c: string) => {
   for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (g[j]?.[i] !== undefined) g[j][i] = c
@@ -109,7 +116,6 @@ function palm(g: Grid, x: number, top: number, lean: number) {
 
 function scenery(): Grid {
   const g: Grid = Array.from({ length: H }, (_, y) => Array<string | null>(W).fill(SKY[Math.min(Math.floor(y / 2), SKY.length - 1)]))
-  for (const [x, y] of STARS) g[y][x] = STAR
   sprite(g, ['.mm', 'm..', 'm..', 'm..', '.mm'], 30, 2, { m: MOON }) // crescent, clear of the faded border
   for (let x = 0; x < W; x++) box(g, x, duneFar(x), 1, H, DUNE_FAR)
   palm(g, 70, 3, 2)
@@ -135,10 +141,18 @@ function scenery(): Grid {
 }
 const SCENERY = scenery()
 
-export function grid(frame: number, grilling: boolean, embers = true): Grid {
+export type Meat = 'raw' | 'cooking' | 'done' | 'eaten'
+// The stage for a turn that has run `elapsedMs`: raw under 15s, cooking under 45s, then done. Never 'eaten'.
+export const meatFor = (elapsedMs: number): Meat => (elapsedMs < 15000 ? 'raw' : elapsedMs < 45000 ? 'cooking' : 'done')
+
+// `embers` false leaves out the embers, and holes where the stars are, which the SVG animates on its own beneath.
+// `meat` holds the meat at one stage; without it the meat cooks and is eaten over the loop.
+export function grid(frame: number, grilling: boolean, embers = true, meat?: Meat): Grid {
   const f = ((frame % FRAMES) + FRAMES) % FRAMES
   const g = SCENERY.map(row => [...row])
-  const eaten = grilling && f >= 44
+  const stage = meat ?? (f < 16 ? 'raw' : f < 32 ? 'cooking' : f < 44 ? 'done' : 'eaten')
+  const eaten = grilling && stage === 'eaten'
+  for (const s of STARS) g[s[1]][s[0]] = embers ? STAR[starDim(s, f) ? 1 : 0] : null
 
   // Fire: each column burns from the logs up, red at the tips, orange then yellow deeper in, white only at the
   // heart, darker at the sides.
@@ -155,7 +169,7 @@ export function grid(frame: number, grilling: boolean, embers = true): Grid {
   if (grilling) {
     for (let x = STICK_X; x <= STICK_END; x++) g[stickY(x)][x] = STICK
     if (!eaten) {
-      const [body, light, shade] = f < 16 ? MEAT.raw : f < 32 ? MEAT.cooking : MEAT.done
+      const [body, light, shade] = MEAT[stage as Exclude<Meat, 'eaten'>]
       for (const x of CHUNKS) {
         const y = stickY(x)
         box(g, x - 1, y - 1, 3, 3, body); g[y - 1][x - 1] = light; g[y + 1][x + 1] = shade
@@ -201,9 +215,9 @@ export function fade(x: number, y: number, w = W): number {
 }
 
 // scale: 4.375 screen pixels per art pixel, as textless's campfire (560 wide for 128).
-export function svg(grilling: boolean, scale = 4.375): string {
-  // The embers are left out of the frames and move on their own, as campfire's do, which keeps the file small.
-  const grids = Array.from({ length: FRAMES }, (_, f) => grid(f, grilling, false))
+export function svg(grilling: boolean, scale = 4.375, meat?: Meat): string {
+  // The embers and stars are left out of the frames and animate on their own, as campfire's do, which keeps the file small.
+  const grids = Array.from({ length: FRAMES }, (_, f) => grid(f, grilling, false, meat))
   const still: [number, number, string][] = []
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const c = grids[0][y][x]
@@ -229,13 +243,16 @@ export function svg(grilling: boolean, scale = 4.375): string {
     const loop = (EMBER_FRAMES * FRAME_MS) / 1000
     return `<g><animateTransform attributeName="transform" type="translate" calcMode="discrete" values="${values}" keyTimes="${times}" dur="${loop}s" repeatCount="indefinite"/><path fill="${e[2]}" d="M${e[0]} ${EMBER_Y}h1v1h-1z"/></g>`
   })
+  // Each star's fill steps from dim to bright once a period, started part way in by its phase.
+  const stars = STARS.map(([x, y, period, dim, phase]) =>
+    `<path fill="${STAR[0]}" d="M${x} ${y}h1v1h-1z"><animate attributeName="fill" calcMode="discrete" values="${STAR[1]};${STAR[0]}" keyTimes="0;${(dim / period).toFixed(4)}" dur="${(period * FRAME_MS) / 1000}s" begin="-${(phase * FRAME_MS) / 1000}s" repeatCount="indefinite"/></path>`)
   const edge: [number, number, string][] = []
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const a = fade(x, y)
     if (a < 1) edge.push([x, y, `#${Math.round(a * 255).toString(16).padStart(2, '0').repeat(3)}`])
   }
   const mask = `<defs><mask id="fade" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#fff"/>${paths(edge)}</mask></defs>`
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W * scale}" height="${H * scale}" viewBox="0 0 ${W} ${H}" shape-rendering="crispEdges">${mask}<g mask="url(#fade)">${paths(still)}${layers.join('')}${embers.join('')}</g></svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W * scale}" height="${H * scale}" viewBox="0 0 ${W} ${H}" shape-rendering="crispEdges">${mask}<g mask="url(#fade)">${stars.join('')}${paths(still)}${layers.join('')}${embers.join('')}</g></svg>`
 }
 
 // The terminal's Raster cells: two pixels per cell with ▀/▄, the terminal's own background where there is none.
@@ -248,8 +265,8 @@ const faded = (c: string | null, x: number, y: number, w: number) => {
   return c && a > 0.2 ? dim(rgb(c), a) : null
 }
 // `columns` crops the scene from the right, for terminals narrower than W.
-export function cells(frame: number, grilling: boolean, columns = W): string {
-  const g = grid(frame, grilling)
+export function cells(frame: number, grilling: boolean, columns = W, meat?: Meat): string {
+  const g = grid(frame, grilling, true, meat)
   const words = new Uint32Array(columns * (H / 2) * 3)
   for (let r = 0; r < H / 2; r++) for (let x = 0; x < columns; x++) {
     const top = faded(g[r * 2][x], x, r * 2, columns), bottom = faded(g[r * 2 + 1][x], x, r * 2 + 1, columns)

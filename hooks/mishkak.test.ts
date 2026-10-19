@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { cells, fade, FRAMES, grid, H, MIN_W, svg, W } from './art'
+import { cells, fade, FRAMES, grid, H, type Meat, meatFor, MIN_W, svg, W } from './art'
 
 const spinner = (columns: number) =>
   ({ component: 'Spinner', props: { word: 'Grilling', message: null, suffix: '…', mode: 'responding' }, viewport: { columns, rows: 40 } }) as any
@@ -38,4 +38,18 @@ test('the skewer shows only while grilling; the meat cooks, then Clawd eats it',
     for (let f = 0; f < FRAMES; f++) expect(atob(cells(f, grilling)).length).toBe(W * (H / 2) * 12)
     expect(atob(cells(0, grilling, MIN_W)).length).toBe(MIN_W * (H / 2) * 12) // cropped for a narrow terminal
   }
+})
+
+test('the stars twinkle, each in its own time', () => {
+  const star = (f: number) => grid(f, false)[1][3]
+  expect(new Set(Array.from({ length: FRAMES }, (_, f) => star(f)))).toEqual(new Set(['#cfd6ff', '#8890c0']))
+  expect(star(0)).not.toBe(grid(0, false)[1][22]) // not in step
+})
+
+test('the meat can be held at a stage, chosen by how long the turn has run', () => {
+  expect([0, 14999, 15000, 44999, 45000, 600000].map(meatFor)).toEqual(['raw', 'raw', 'cooking', 'cooking', 'done', 'done'])
+  for (let f = 0; f < FRAMES; f++) expect(grid(f, true, true, 'done')[12][40]).toBe('#6e3a20')
+  for (let f = 0; f < FRAMES; f++) expect(grid(f, true, true, 'eaten')[12][40]).toBe('#d9b380')
+  for (const meat of ['raw', 'cooking', 'done', 'eaten', undefined] as (Meat | undefined)[])
+    for (const grilling of [true, false]) expect(svg(grilling, undefined, meat).length).toBeLessThan(131072)
 })
