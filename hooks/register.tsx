@@ -1,5 +1,5 @@
 import type { Register } from 'claude-code'
-import { cells, FRAME_MS, FRAMES, H, svg, W } from './art'
+import { cells, FRAME_MS, FRAMES, H, MIN_W, svg, W } from './art'
 
 const SVG = { grilling: svg(true), idle: svg(false) }
 const frameNow = () => Math.floor(Date.now() / FRAME_MS) % FRAMES
@@ -15,7 +15,7 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, ($, e, next) => {
     const { isWorking, hasSurvey, bodyColumns } = e.props
-    const show = !hasSurvey && bodyColumns >= W
+    const show = !hasSurvey && bodyColumns >= MIN_W
     // shortcut: idle, the terminal shows a still frame (no 4/s redraws while nothing happens).
     ticking = show && isWorking && e.surface === 'terminal'
     if (!show) return next(e)
@@ -23,7 +23,8 @@ export const register: Register = on => {
     // The terminal gets a fresh Raster each tick; the others animate the SVG themselves (SMIL needs isInteractive).
     if (e.surface === 'terminal') {
       const { Raster } = $.ui.resolve(e)
-      return <Raster key="mishkak" columns={W} rows={H / 2} cells={cells(isWorking ? frameNow() : 0, isWorking)} />
+      const columns = Math.min(W, bodyColumns)
+      return <Raster key="mishkak" columns={columns} rows={H / 2} cells={cells(isWorking ? frameNow() : 0, isWorking, columns)} />
     }
     const { Svg } = $.ui.resolve(e) as any // every surface but the terminal has Svg
     return isWorking
