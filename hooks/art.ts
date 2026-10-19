@@ -39,9 +39,10 @@ const CROWN = [
 ]
 
 // Clawd as on Claude Code's welcome screen: 18 x 5, every row drawn twice. Eyes on row 1, arms on row 2.
+// The eyes sit toward the right edge, as in textless's campfire, so Clawd looks at the fire rather than out.
 const CLAWD_ROWS = (blink: boolean) => [
   '...############...',
-  blink ? '...############...' : '...##e######e##...',
+  blink ? '...############...' : '...####e#####e#...',
   '.################.',
   '...############...',
   '....#.#....#.#....',
