@@ -47,7 +47,9 @@ const CLAWD_ROWS = (blink: boolean) => [
   '....#.#....#.#....',
 ]
 
-const CHUNKS = [26, 30, 34, 38] // left x of each 3x3 piece of meat
+// The skewer rises from Clawd's hand over the fire, one pixel up every four across, as in textless's campfire.
+const stickY = (x: number) => 12 - Math.floor((x - 18) / 4)
+const CHUNKS = [27, 31, 35, 39] // centre x of each 3x3 piece of meat, threaded on the skewer
 const FIRE_X = 25
 // Flame height per column, one row per fire frame.
 const FIRE = [
@@ -106,10 +108,13 @@ export function grid(frame: number, grilling: boolean): Grid {
 
   // The skewer from Clawd's arm, and the four pieces of meat cooking on it, only while Claude works.
   if (grilling) {
-    box(g, 18, 12, 26, 1, STICK)
+    for (let x = 18; x <= 40; x++) g[stickY(x)][x] = STICK
     if (!eaten) {
       const [body, light, shade] = f < 16 ? MEAT.raw : f < 32 ? MEAT.cooking : MEAT.done
-      for (const x of CHUNKS) { box(g, x, 11, 3, 3, body); g[11][x] = light; g[13][x + 2] = shade }
+      for (const x of CHUNKS) {
+        const y = stickY(x)
+        box(g, x - 1, y - 1, 3, 3, body); g[y - 1][x - 1] = light; g[y + 1][x + 1] = shade
+      }
     }
   }
 

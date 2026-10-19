@@ -20,7 +20,7 @@ test('the scene shows on every surface, and steps aside when it does not fit', a
 
 test('the skewer shows only while grilling; the meat cooks, then Clawd eats it', () => {
   const stick = (f: number, grilling: boolean) => grid(f, grilling)[12][20]
-  const meat = (f: number) => grid(f, true)[12][27] // the middle row of the first piece
+  const meat = (f: number) => grid(f, true)[10][27] // the middle of the first piece
   expect(stick(0, true)).toBe('#d9b380')
   expect(stick(0, false)).not.toBe('#d9b380')
   expect(new Set([meat(0), meat(20), meat(40)]).size).toBe(3)
