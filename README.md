@@ -1,7 +1,5 @@
 <p align="center"><img src="preview.svg" alt="Clawd grilling mishkak by a campfire in the Omani dunes" width="100%"></p>
 
-# Clawd Mishkak 🍢
-
 A Claude Code mod. While Claude works, Clawd grills **mishkak** by a campfire in the Omani dunes, right in the transcript under the streaming answer, where the spinner line is. The meat cooks the longer Claude works, and is done once Claude starts writing its answer. After each answer, Clawd rests by the fire on its closing line.
 
 Top right: this prompt's cost · context used · time.
