@@ -1,6 +1,6 @@
 {
   "name": "mishkak",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "author": { "name": "Ahmed Al Wahaibi" },
-  "description": "While Claude works, Clawd grills a skewer of mishkak above the prompt. The text keeps streaming as usual."
+  "description": "While Claude works, Clawd grills a skewer of mishkak by a campfire in the transcript, where the spinner is. The text keeps streaming as usual."
 }

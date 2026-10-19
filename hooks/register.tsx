@@ -32,10 +32,14 @@ export const register: Register = on => {
   let latest: string | undefined
   let awaiting = false
   const seen = new Set<string>()
+  // The usage call is made at most once a second, not on every 250ms frame.
+  type Usage = { cost?: { usd: number }; context: { percent?: number } } | undefined
+  let usage: Usage
+  let usageAt = 0
 
   // This prompt's cost, how full the context is, and how long it has run: `$0.04 · 24% · 1m05s`.
   // A host that can't say (the call failed) shows no stats rather than no Clawd.
-  const stats = (usage: { cost?: { usd: number }; context: { percent?: number } } | undefined) => {
+  const stats = (usage: Usage) => {
     if (!showStats || !usage) return ''
     const { cost, context } = usage
     const percent = context.percent === undefined ? '–' : `${Math.round(context.percent)}%`
@@ -72,6 +76,7 @@ export const register: Register = on => {
     if (e.agentId !== undefined) return next(e)
     startedAt = Date.now()
     reached = 0
+    usageAt = 0
     costAtStart = (await $.session.usage().catch(() => undefined))?.cost?.usd ?? 0
     // The last turn's idle scene steps aside for the grilling one.
     latest = undefined
@@ -94,7 +99,8 @@ export const register: Register = on => {
     if (!isOn || columns < MIN_W) return next(e)
     if (e.props.mode === 'responding') reached = STAGES.length - 1
     const line = await next(e)
-    const text = stats(await $.session.usage().catch(() => undefined))
+    if (Date.now() - usageAt >= 1000) usage = await $.session.usage().catch(() => undefined), usageAt = Date.now()
+    const text = stats(usage)
     const { Box } = $.ui.resolve(e)
 
     // The terminal gets a fresh Raster each tick; the others animate the SVG themselves (SMIL needs isInteractive).
@@ -123,6 +129,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'TurnDuration' }, async ($, e, next) => {
     if (awaiting && !seen.has(e.requestId)) latest = e.requestId, awaiting = false
     seen.add(e.requestId)
+    if (seen.size > 100) seen.delete(seen.values().next().value!) // only recent rows can come back to claim it
     const columns = Math.min(W, (e.viewport?.columns ?? W) - 2)
     if (!isOn || e.surface !== 'terminal' || e.requestId !== latest || columns < MIN_W) return next(e)
     const line = await next(e)
