@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { cells, FRAMES, grid, H, MIN_W, svg, W } from './art'
+import { cells, fade, FRAMES, grid, H, MIN_W, svg, W } from './art'
 
 const band = (isWorking: boolean, bodyColumns = 120) =>
   ({ component: 'AbovePrompt', props: { isWorking, hasSurvey: false, maxRows: 20, bodyColumns, scroll: { bodyRows: 19 }, view: {} } }) as any
@@ -29,6 +29,11 @@ test('the skewer shows only while grilling; the meat cooks, then Clawd eats it',
   expect(grid(0, false)[18][44]).toBe('#ff9f43')
   expect(grid(1, false)[16][44]).toBe('#ff9f43')
   expect(svg(false)).toContain('animateTransform')
+  // The faded border: gone at the corners, untouched in the middle, and it follows a cropped edge.
+  expect(fade(0, 0)).toBe(0)
+  expect(fade(W / 2, H / 2)).toBe(1)
+  expect(fade(MIN_W - 1, H / 2, MIN_W)).toBeLessThan(1)
+  expect(svg(true)).toContain('mask="url(#fade)"')
   for (const grilling of [true, false]) {
     expect(svg(grilling).length).toBeLessThan(131072) // the Svg element's limit
     for (let f = 0; f < FRAMES; f++) expect(atob(cells(f, grilling)).length).toBe(W * (H / 2) * 12)

@@ -110,7 +110,7 @@ function palm(g: Grid, x: number, top: number, lean: number) {
 function scenery(): Grid {
   const g: Grid = Array.from({ length: H }, (_, y) => Array<string | null>(W).fill(SKY[Math.min(Math.floor(y / 2), SKY.length - 1)]))
   for (const [x, y] of STARS) g[y][x] = STAR
-  sprite(g, ['.mm', 'm..', 'm..', 'm..', '.mm'], 88, 1, { m: MOON }) // crescent
+  sprite(g, ['.mm', 'm..', 'm..', 'm..', '.mm'], 30, 2, { m: MOON }) // crescent, clear of the faded border
   for (let x = 0; x < W; x++) box(g, x, duneFar(x), 1, H, DUNE_FAR)
   palm(g, 70, 3, 2)
   palm(g, 85, 8, -1)
@@ -189,6 +189,17 @@ function paths(cells: [number, number, string][]): string {
 
 // The whole loop as one SMIL-animated SVG: what never changes drawn once, then one group per distinct
 // remainder, shown on the frames that have it.
+// The faded border, after textless's campfire but thinner: a rounded frame FADE pixels deep, in campfire's six
+// steps of opacity (0 to 1 by 0.2), dithered so the steps break up into pixels instead of bands.
+const FADE = 5
+export function fade(x: number, y: number, w = W): number {
+  const dx = Math.max(0, FADE - Math.min(x + 0.5, w - x - 0.5))
+  const dy = Math.max(0, FADE - Math.min(y + 0.5, H - y - 0.5))
+  const alpha = Math.max(0, 1 - Math.hypot(dx, dy) / FADE)
+  const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453 // a fixed per-pixel noise in [0, 1)
+  return Math.min(5, Math.floor(alpha * 5 + n - Math.floor(n))) / 5
+}
+
 // scale: 4.375 screen pixels per art pixel, as textless's campfire (560 wide for 128).
 export function svg(grilling: boolean, scale = 4.375): string {
   // The embers are left out of the frames and move on their own, as campfire's do, which keeps the file small.
@@ -218,19 +229,31 @@ export function svg(grilling: boolean, scale = 4.375): string {
     const loop = (EMBER_FRAMES * FRAME_MS) / 1000
     return `<g><animateTransform attributeName="transform" type="translate" calcMode="discrete" values="${values}" keyTimes="${times}" dur="${loop}s" repeatCount="indefinite"/><path fill="${e[2]}" d="M${e[0]} ${EMBER_Y}h1v1h-1z"/></g>`
   })
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W * scale}" height="${H * scale}" viewBox="0 0 ${W} ${H}" shape-rendering="crispEdges">${paths(still)}${layers.join('')}${embers.join('')}</svg>`
+  const edge: [number, number, string][] = []
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const a = fade(x, y)
+    if (a < 1) edge.push([x, y, `#${Math.round(a * 255).toString(16).padStart(2, '0').repeat(3)}`])
+  }
+  const mask = `<defs><mask id="fade" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#fff"/>${paths(edge)}</mask></defs>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W * scale}" height="${H * scale}" viewBox="0 0 ${W} ${H}" shape-rendering="crispEdges">${mask}<g mask="url(#fade)">${paths(still)}${layers.join('')}${embers.join('')}</g></svg>`
 }
 
 // The terminal's Raster cells: two pixels per cell with ▀/▄, the terminal's own background where there is none.
+// The faded border darkens toward black and, at its faintest, lets the terminal's background through.
 const DEFAULT = 0x01000000
 const rgb = (c: string) => parseInt(c.slice(1), 16)
+const dim = (c: number, a: number) => (Math.round(((c >> 16) & 255) * a) << 16) | (Math.round(((c >> 8) & 255) * a) << 8) | Math.round((c & 255) * a)
+const faded = (c: string | null, x: number, y: number, w: number) => {
+  const a = fade(x, y, w)
+  return c && a > 0.2 ? dim(rgb(c), a) : null
+}
 // `columns` crops the scene from the right, for terminals narrower than W.
 export function cells(frame: number, grilling: boolean, columns = W): string {
   const g = grid(frame, grilling)
   const words = new Uint32Array(columns * (H / 2) * 3)
   for (let r = 0; r < H / 2; r++) for (let x = 0; x < columns; x++) {
-    const top = g[r * 2][x], bottom = g[r * 2 + 1][x]
-    const cell = top ? [0x2580, rgb(top), bottom ? rgb(bottom) : DEFAULT] : bottom ? [0x2584, rgb(bottom), DEFAULT] : [0x20, DEFAULT, DEFAULT]
+    const top = faded(g[r * 2][x], x, r * 2, columns), bottom = faded(g[r * 2 + 1][x], x, r * 2 + 1, columns)
+    const cell = top !== null ? [0x2580, top, bottom ?? DEFAULT] : bottom !== null ? [0x2584, bottom, DEFAULT] : [0x20, DEFAULT, DEFAULT]
     words.set(cell, (r * columns + x) * 3)
   }
   return new Uint8Array(words.buffer).toBase64()
