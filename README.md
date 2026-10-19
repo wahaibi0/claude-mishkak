@@ -2,7 +2,7 @@
 
 # Mishkak 🍢
 
-A Claude Code mod. While Claude works, Clawd grills **mishkak** by a campfire in the Omani dunes, above the prompt, and the answer keeps streaming as usual. The meat cooks from raw to charred, then Clawd eats it. When Claude is idle, Clawd just sits by the fire.
+A Claude Code mod. While Claude works, Clawd grills **mishkak** by a campfire in the Omani dunes, right in the transcript under the streaming answer, where the spinner line is. The meat cooks from raw to charred, then Clawd eats it.
 
 ## Install
 

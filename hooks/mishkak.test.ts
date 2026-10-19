@@ -1,18 +1,17 @@
 import { expect, test } from 'claude-code/testing'
 import { cells, fade, FRAMES, grid, H, MIN_W, svg, W } from './art'
 
-const band = (isWorking: boolean, bodyColumns = 120) =>
-  ({ component: 'AbovePrompt', props: { isWorking, hasSurvey: false, maxRows: 20, bodyColumns, scroll: { bodyRows: 19 }, view: {} } }) as any
+const spinner = (columns: number) =>
+  ({ component: 'Spinner', props: { word: 'Grilling', message: null, suffix: '…', mode: 'responding' }, viewport: { columns, rows: 40 } }) as any
 
-test('the scene shows on every surface, and steps aside when it does not fit', async ($, on) => {
-  on('ui.render', ($$, e) => { const { Box } = $$.ui.resolve(e); return h(Box, {}) as any }) // the engine's own band: empty
+test('the scene takes the spinner\'s place in the transcript, keeping its line, and steps aside when narrow', async ($, on) => {
+  on('ui.render', ($$, e) => { const { Text } = $$.ui.resolve(e); return h(Text, { key: 'line' }, 'Grilling…') as any }) // the engine's spinner line
   for (const [surface, type] of [['terminal', 'Raster'], ['desktop', 'Svg']] as const) {
-    for (const working of [true, false]) {
-      const ui = await $.ui.mount({ plugin: 'mishkak', surface, ...band(working) })
-      expect(await ui.find({ type })).toBeDefined()
-      await ui.unmount()
-    }
-    const narrow = await $.ui.mount({ plugin: 'mishkak', surface, ...band(true, MIN_W - 1) })
+    const ui = await $.ui.mount({ plugin: 'mishkak', surface, ...spinner(120) })
+    expect(await ui.find({ type })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Grilling/ })).toBeDefined()
+    await ui.unmount()
+    const narrow = await $.ui.mount({ plugin: 'mishkak', surface, ...spinner(MIN_W) })
     expect(await narrow.find({ type })).toBeUndefined()
     await narrow.unmount()
   }
