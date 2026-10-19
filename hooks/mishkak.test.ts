@@ -25,6 +25,10 @@ test('the skewer shows only while grilling; the meat cooks, then Clawd eats it',
   expect(stick(0, false)).not.toBe('#d9b380')
   expect(new Set([meat(0), meat(20), meat(40)]).size).toBe(3)
   expect(meat(46)).toBe('#d9b380') // only the bare skewer left
+  // Embers rise from the fire: the first leaves at (44, 18) and is 2 pixels higher a frame later.
+  expect(grid(0, false)[18][44]).toBe('#ff9f43')
+  expect(grid(1, false)[16][44]).toBe('#ff9f43')
+  expect(svg(false)).toContain('animateTransform')
   for (const grilling of [true, false]) {
     expect(svg(grilling).length).toBeLessThan(131072) // the Svg element's limit
     for (let f = 0; f < FRAMES; f++) expect(atob(cells(f, grilling)).length).toBe(W * (H / 2) * 12)

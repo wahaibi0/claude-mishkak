@@ -74,6 +74,20 @@ const FIRE = [
   [2, 4, 4, 7, 9, 8, 10, 12, 11, 9, 11, 9, 7, 8, 4, 3, 2],
   [3, 3, 6, 7, 6, 9, 12, 11, 9, 11, 12, 8, 8, 6, 5, 2, 2],
 ]
+// Embers, as in textless's campfire: sparks leave the flames and rise 2 pixels a frame, swaying left and right,
+// each on its own 12-frame (3s) loop. Each is x, phase, colour and which way it sways first.
+const EMBER_FRAMES = 12
+const SWAY = [0, 0, -1, -1, -2, -1, 0, 1, 1, 2, 1, 0]
+const EMBERS: [number, number, string, number][] = [
+  [44, 0, '#ff9f43', 1], [47, 7, '#ffd36b', -1], [49, 4, '#ff9f43', 1],
+  [52, 10, '#ffd36b', -1], [46, 2, '#ffd36b', 1], [50, 5, '#ff9f43', -1],
+]
+const EMBER_Y = 18
+const emberStep = ([, phase, , dir]: (typeof EMBERS)[number], f: number) => {
+  const p = (f + phase) % EMBER_FRAMES
+  return [dir * SWAY[p], -2 * p]
+}
+
 const STARS: [number, number][] = [[3, 1], [14, 4], [22, 1], [31, 6], [40, 2], [47, 5], [36, 0], [9, 7], [58, 3], [63, 8], [71, 1], [26, 9], [52, 10], [78, 4]]
 
 const box = (g: Grid, x: number, y: number, w: number, h: number, c: string) => {
@@ -121,7 +135,7 @@ function scenery(): Grid {
 }
 const SCENERY = scenery()
 
-export function grid(frame: number, grilling: boolean): Grid {
+export function grid(frame: number, grilling: boolean, embers = true): Grid {
   const f = ((frame % FRAMES) + FRAMES) % FRAMES
   const g = SCENERY.map(row => [...row])
   const eaten = grilling && f >= 44
@@ -152,6 +166,11 @@ export function grid(frame: number, grilling: boolean): Grid {
   // Clawd: blinks now and then; done eating, a happy hop.
   const eyes: Eyes = eaten ? 'happy' : f === 10 || f === 30 ? 'blink' : 'open'
   clawd(g, eyes, grilling, eaten && f % 2 === 0 ? 1 : 0)
+
+  if (embers) for (const e of EMBERS) {
+    const [dx, dy] = emberStep(e, f)
+    box(g, e[0] + dx, EMBER_Y + dy, 1, 1, e[2])
+  }
   return g
 }
 
@@ -172,7 +191,8 @@ function paths(cells: [number, number, string][]): string {
 // remainder, shown on the frames that have it.
 // scale: 4.375 screen pixels per art pixel, as textless's campfire (560 wide for 128).
 export function svg(grilling: boolean, scale = 4.375): string {
-  const grids = Array.from({ length: FRAMES }, (_, f) => grid(f, grilling))
+  // The embers are left out of the frames and move on their own, as campfire's do, which keeps the file small.
+  const grids = Array.from({ length: FRAMES }, (_, f) => grid(f, grilling, false))
   const still: [number, number, string][] = []
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const c = grids[0][y][x]
@@ -192,7 +212,13 @@ export function svg(grilling: boolean, scale = 4.375): string {
     const values = Array.from({ length: FRAMES }, (_, f) => (frames.includes(f) ? 1 : 0)).join(';')
     return `<g opacity="${frames.includes(0) ? 1 : 0}"><animate attributeName="opacity" calcMode="discrete" values="${values}" keyTimes="${keyTimes}" dur="${dur}s" repeatCount="indefinite"/>${art}</g>`
   })
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W * scale}" height="${H * scale}" viewBox="0 0 ${W} ${H}" shape-rendering="crispEdges">${paths(still)}${layers.join('')}</svg>`
+  const embers = EMBERS.map(e => {
+    const values = Array.from({ length: EMBER_FRAMES }, (_, f) => emberStep(e, f).join(' ')).join(';')
+    const times = Array.from({ length: EMBER_FRAMES }, (_, f) => (f / EMBER_FRAMES).toFixed(4)).join(';')
+    const loop = (EMBER_FRAMES * FRAME_MS) / 1000
+    return `<g><animateTransform attributeName="transform" type="translate" calcMode="discrete" values="${values}" keyTimes="${times}" dur="${loop}s" repeatCount="indefinite"/><path fill="${e[2]}" d="M${e[0]} ${EMBER_Y}h1v1h-1z"/></g>`
+  })
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W * scale}" height="${H * scale}" viewBox="0 0 ${W} ${H}" shape-rendering="crispEdges">${paths(still)}${layers.join('')}${embers.join('')}</svg>`
 }
 
 // The terminal's Raster cells: two pixels per cell with ▀/▄, the terminal's own background where there is none.
