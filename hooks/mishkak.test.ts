@@ -43,6 +43,26 @@ test('/mishkak off leaves the spinner its own line, and on brings Clawd back', a
   }
 })
 
+test('stats sit in the corner and toggle; the meat is done once Claude is answering', async ($, on) => {
+  engine(on)
+  on('session.usage', () => ({ value: { startedAt: 0, rateLimits: [], context: { window: 200000, percent: 24.4 }, cost: { usd: 0.04 } } }) as any)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'hi', turnId: 't1' })
+  const source = async () => {
+    const ui = await $.ui.mount({ plugin: 'mishkak', surface: 'desktop', ...spinner(120) })
+    const found = (await ui.find({ type: 'Svg' })) as any
+    await ui.unmount()
+    return String(found?.props?.source ?? '')
+  }
+  expect(await source()).toMatch(/\$0\.00 · 24% · 0s<\/text>/) // nothing spent since this prompt began
+  expect(await source()).toContain(svg(true, undefined, 'done').slice(-200, -6)) // answering (mode 'responding'): done
+  await $.command.run({ command: 'mishkak', args: 'stats off' } as any)
+  expect(await source()).not.toContain('<text')
+  await $.command.run({ command: 'mishkak', args: 'stats' } as any)
+  expect(await source()).toContain('<text')
+  expect(atob(cells(0, true, W, 'raw', '$0.04')).length).toBe(W * (H / 2) * 12) // stats keep the Raster's size
+})
+
 test('the latest turn\'s closing line shows Clawd idle by the fire; older ones and a new turn drop it', async ($, on) => {
   engine(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })

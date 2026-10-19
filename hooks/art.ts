@@ -255,6 +255,16 @@ export function svg(grilling: boolean, scale = 4.375, meat?: Meat): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W * scale}" height="${H * scale}" viewBox="0 0 ${W} ${H}" shape-rendering="crispEdges">${mask}<g mask="url(#fade)">${stars.join('')}${paths(still)}${layers.join('')}${embers.join('')}</g></svg>`
 }
 
+// Prompt stats in the top right corner: plain text, light on the night sky.
+const STATS_INK = '#ece6dc'
+const STATS_ROW = 1 // terminal cell row: pixel rows 2 and 3
+const STATS_INSET = 3 // cells from the right edge, past the faded border
+export function withStats(source: string, stats: string): string {
+  if (!stats) return source
+  const text = stats.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  return source.replace(/<\/svg>$/, `<text x="${W - STATS_INSET * 2}" y="5" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="3" fill="${STATS_INK}" stroke="#0d1029" stroke-width="0.6" paint-order="stroke">${text}</text></svg>`)
+}
+
 // The terminal's Raster cells: two pixels per cell with ▀/▄, the terminal's own background where there is none.
 // The faded border darkens toward black and, at its faintest, lets the terminal's background through.
 const DEFAULT = 0x01000000
@@ -264,13 +274,16 @@ const faded = (c: string | null, x: number, y: number, w: number) => {
   const a = fade(x, y, w)
   return c && a > 0.2 ? dim(rgb(c), a) : null
 }
-// `columns` crops the scene from the right, for terminals narrower than W.
-export function cells(frame: number, grilling: boolean, columns = W, meat?: Meat): string {
+// `columns` crops the scene from the right, for terminals narrower than W. `stats` is written in the sky's top
+// right corner, one character a cell over the sky's colour, clear of the faded border.
+export function cells(frame: number, grilling: boolean, columns = W, meat?: Meat, stats = ''): string {
+  const from = columns - STATS_INSET - stats.length
   const g = grid(frame, grilling, true, meat)
   const words = new Uint32Array(columns * (H / 2) * 3)
   for (let r = 0; r < H / 2; r++) for (let x = 0; x < columns; x++) {
     const top = faded(g[r * 2][x], x, r * 2, columns), bottom = faded(g[r * 2 + 1][x], x, r * 2 + 1, columns)
     const cell = top !== null ? [0x2580, top, bottom ?? DEFAULT] : bottom !== null ? [0x2584, bottom, DEFAULT] : [0x20, DEFAULT, DEFAULT]
+    if (r === STATS_ROW && x >= from && x < from + stats.length) cell.splice(0, 3, stats.charCodeAt(x - from), rgb(STATS_INK), top ?? DEFAULT)
     words.set(cell, (r * columns + x) * 3)
   }
   return new Uint8Array(words.buffer).toBase64()
