@@ -1,16 +1,17 @@
-// Clawd grilling mishkak: a 40x16 pixel scene, 48 frames of 250ms (a 12s loop).
+// Clawd at a campfire in the Omani dunes at dusk: a 64x20 pixel scene, 48 frames of 250ms (a 12s loop).
+// While Claude works Clawd grills a skewer of mishkak; otherwise Clawd just sits by the fire.
 // One grid per frame feeds both the desktop's SVG and the terminal's half-block cells.
 
-export const W = 40
-export const H = 16
+export const W = 64
+export const H = 20
 export const FRAMES = 48
 export const FRAME_MS = 250
 
 type Grid = (string | null)[][]
 
-const CLAWD = '#d97757'
-const EYE = '#2a1d18'
-const STICK = '#b88a5c'
+const CLAWD = '#d77757'
+const EYE = '#1e1b1a'
+const STICK = '#d9b380'
 const LOG = '#5a3a24'
 const LOG_DARK = '#3a2416'
 const FLAME = ['#fff4c2', '#ffd36b', '#ff9f43', '#ea5a32', '#b8372a'] // core to edge
@@ -19,52 +20,103 @@ const MEAT = {
   cooking: ['#a65a34', '#cf8550', '#7a3c22'],
   done: ['#6e3a20', '#9a5a30', '#3a1c10'],
 }
-const CHUNKS = [20, 24, 28, 32] // left x of each 3x3 piece on the skewer
-const FIRE_X = 19
-// Flame height per column, one row per fire frame.
-const FIRE = [
-  [1, 2, 3, 3, 4, 5, 4, 5, 6, 5, 4, 5, 4, 3, 3, 2, 1],
-  [1, 2, 2, 4, 5, 4, 5, 6, 5, 4, 5, 4, 3, 4, 2, 2, 1],
-  [2, 2, 3, 4, 3, 4, 6, 5, 4, 5, 6, 4, 4, 3, 3, 1, 1],
+const SKY = ['#0d1029', '#0d1029', '#121638', '#181c44', '#1f224e', '#282755', '#332c5a', '#40325c', '#4e385c', '#5c3e5a']
+const DUNE_FAR = '#3c2e44'
+const DUNE = ['#9a7458', '#7a5846', '#5f4338'] // moonlit crest, face, foot
+const MOON = '#f3e6b8'
+const STAR = '#cfd6ff'
+const TRUNK = ['#4f3626', '#3d2a1e']
+const PALM: Record<string, string> = { g: '#2f6034', G: '#1f4226', d: '#a0582a' } // fronds, shade, dates
+
+// A date palm's crown, centred on its middle column; the trunk meets it at the bottom row of fronds.
+const CROWN = [
+  '.....ggg.ggg.....',
+  '...ggGGGgGGGgg...',
+  '.ggGgg.gGg.ggGgg.',
+  'gGg...gGGGg...gGg',
+  'g....g.ddd.g....g',
+  '.......ddd.......',
 ]
 
+// Clawd as on Claude Code's welcome screen: 18 x 5, every row drawn twice. Eyes on row 1, arms on row 2.
+const CLAWD_ROWS = (blink: boolean) => [
+  '...############...',
+  blink ? '...############...' : '...##e######e##...',
+  '.################.',
+  '...############...',
+  '....#.#....#.#....',
+]
+
+const CHUNKS = [26, 30, 34, 38] // left x of each 3x3 piece of meat
+const FIRE_X = 25
+// Flame height per column, one row per fire frame.
+const FIRE = [
+  [1, 2, 3, 3, 4, 5, 4, 5, 5, 5, 4, 5, 4, 3, 3, 2, 1],
+  [1, 2, 2, 4, 5, 4, 5, 5, 5, 4, 5, 4, 3, 4, 2, 2, 1],
+  [2, 2, 3, 4, 3, 4, 5, 5, 4, 5, 5, 4, 4, 3, 3, 1, 1],
+]
+const STARS: [number, number][] = [[3, 1], [14, 3], [22, 1], [31, 4], [40, 2], [47, 5], [36, 0], [9, 5]]
+
 const box = (g: Grid, x: number, y: number, w: number, h: number, c: string) => {
-  for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) g[j][i] = c
+  for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (g[j]?.[i] !== undefined) g[j][i] = c
+}
+const sprite = (g: Grid, rows: string[], ox: number, oy: number, colours: Record<string, string>) =>
+  rows.forEach((row, y) => [...row].forEach((c, x) => { if (colours[c]) box(g, ox + x, oy + y, 1, 1, colours[c]) }))
+
+const duneFar = (x: number) => Math.round(10 + 1.6 * Math.sin(x / 6 + 1) + Math.sin(x / 2.7))
+const duneNear = (x: number) => Math.round(14 + 1.4 * Math.sin(x / 9 + 2.2))
+
+function palm(g: Grid, x: number, top: number, lean: number) {
+  for (let y = top + 4; y < H; y++) {
+    const tx = x + Math.round((lean * (H - y)) / (H - top))
+    box(g, tx, y, 2, 1, TRUNK[y % 2])
+  }
+  sprite(g, CROWN, x + lean - 7, top, PALM)
 }
 
-export function grid(frame: number): Grid {
+function scenery(): Grid {
+  const g: Grid = Array.from({ length: H }, (_, y) => Array<string | null>(W).fill(SKY[Math.min(y, SKY.length - 1)]))
+  for (const [x, y] of STARS) g[y][x] = STAR
+  sprite(g, ['.mm', 'm..', 'm..', '.mm'], 55, 1, { m: MOON }) // crescent
+  for (let x = 0; x < W; x++) box(g, x, duneFar(x), 1, H, DUNE_FAR)
+  palm(g, 46, 3, 2)
+  palm(g, 56, 5, -1)
+  for (let x = 0; x < W; x++) {
+    const y = duneNear(x)
+    box(g, x, y, 1, H, DUNE[2])
+    box(g, x, y, 1, 3, DUNE[1])
+    g[y][x] = DUNE[0]
+  }
+  return g
+}
+const SCENERY = scenery()
+
+export function grid(frame: number, grilling: boolean): Grid {
   const f = ((frame % FRAMES) + FRAMES) % FRAMES
-  const g: Grid = Array.from({ length: H }, () => Array<string | null>(W).fill(null))
-  const eaten = f >= 44
-
-  // Clawd: body, the arm holding the skewer, four legs, eyes.
-  box(g, 2, 4, 10, 7, CLAWD)
-  box(g, 1, 7, 1, 2, CLAWD)
-  box(g, 12, 6, 2, 2, CLAWD)
-  for (const x of [3, 5, 8, 10]) box(g, x, 11, 1, 3, CLAWD)
-  if (eaten) {
-    // ^ ^ happy eyes once the mishkak is gone
-    for (const x of [4, 8]) { g[6][x] = EYE; g[5][x + 1] = EYE; g[6][x + 2] = EYE }
-  } else if (f === 10 || f === 30) {
-    box(g, 4, 6, 2, 1, EYE); box(g, 8, 6, 2, 1, EYE) // blink
-  } else {
-    box(g, 4, 5, 1, 2, EYE); box(g, 9, 5, 1, 2, EYE)
-  }
-
-  // The skewer, then the four pieces of meat cooking on it.
-  box(g, 14, 6, 23, 1, STICK)
-  if (!eaten) {
-    const [body, light, shade] = f < 16 ? MEAT.raw : f < 32 ? MEAT.cooking : MEAT.done
-    for (const x of CHUNKS) { box(g, x, 5, 3, 3, body); g[5][x] = light; g[7][x + 2] = shade }
-  }
+  const g = SCENERY.map(row => [...row])
+  const eaten = grilling && f >= 44
 
   // Fire: each column burns from the logs up, red at the tips, paler deeper in, darker at the sides.
   FIRE[f % 3].forEach((h, i) => {
     const side = Math.min(i, 16 - i) < 3 ? 1 : 0
-    for (let k = 0; k < h; k++) g[13 - k][FIRE_X + i] = FLAME[Math.max(0, 3 - (h - 1 - k)) + side]
+    for (let k = 0; k < h; k++) g[17 - k][FIRE_X + i] = FLAME[Math.max(0, 3 - (h - 1 - k)) + side]
   })
-  box(g, 18, 14, 19, 1, LOG)
-  box(g, 20, 15, 15, 1, LOG_DARK)
+  box(g, 24, 18, 19, 1, LOG)
+  box(g, 26, 19, 15, 1, LOG_DARK)
+
+  // The skewer from Clawd's arm, and the four pieces of meat cooking on it, only while Claude works.
+  if (grilling) {
+    box(g, 18, 12, 26, 1, STICK)
+    if (!eaten) {
+      const [body, light, shade] = f < 16 ? MEAT.raw : f < 32 ? MEAT.cooking : MEAT.done
+      for (const x of CHUNKS) { box(g, x, 11, 3, 3, body); g[11][x] = light; g[13][x + 2] = shade }
+    }
+  }
+
+  // Clawd: blinks now and then; done eating, a happy hop with eyes shut.
+  const hop = eaten && f % 2 === 0 ? 1 : 0
+  const rows = CLAWD_ROWS(eaten || f === 10 || f === 30).flatMap(r => [r, r])
+  sprite(g, rows, 1, 8 - hop, { '#': CLAWD, e: EYE })
   return g
 }
 
@@ -83,8 +135,8 @@ function paths(cells: [number, number, string][]): string {
 
 // The whole loop as one SMIL-animated SVG: what never changes drawn once, then one group per distinct
 // remainder, shown on the frames that have it.
-export function svg(scale = 6): string {
-  const grids = Array.from({ length: FRAMES }, (_, f) => grid(f))
+export function svg(grilling: boolean, scale = 6): string {
+  const grids = Array.from({ length: FRAMES }, (_, f) => grid(f, grilling))
   const still: [number, number, string][] = []
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const c = grids[0][y][x]
@@ -110,8 +162,8 @@ export function svg(scale = 6): string {
 // The terminal's Raster cells: two pixels per cell with ▀/▄, the terminal's own background where there is none.
 const DEFAULT = 0x01000000
 const rgb = (c: string) => parseInt(c.slice(1), 16)
-export function cells(frame: number): string {
-  const g = grid(frame)
+export function cells(frame: number, grilling: boolean): string {
+  const g = grid(frame, grilling)
   const words = new Uint32Array(W * (H / 2) * 3)
   for (let r = 0; r < H / 2; r++) for (let x = 0; x < W; x++) {
     const top = g[r * 2][x], bottom = g[r * 2 + 1][x]
